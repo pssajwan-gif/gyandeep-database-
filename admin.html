@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GyanDeep Database - Admin Panel</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: Arial, sans-serif; 
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      color: #fff; padding: 20px; 
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { text-align: center; margin-bottom: 30px; color: #fbbf24; }
+    .card { 
+      background: rgba(255,255,255,0.1); 
+      padding: 20px; border-radius: 12px; 
+      margin-bottom: 20px; backdrop-filter: blur(10px);
+    }
+    input, textarea, select { 
+      width: 100%; padding: 12px; margin: 8px 0; 
+      border: 1px solid #374151; border-radius: 8px;
+      background: #1f2937; color: #fff; font-size: 16px;
+    }
+    textarea { min-height: 200px; }
+    button { 
+      background: #fbbf24; color: #000; border: none; 
+      padding: 12px 24px; border-radius: 8px; font-weight: bold;
+      cursor: pointer; margin: 5px; font-size: 16px;
+    }
+    button:hover { background: #f59e0b; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .episode-list { max-height: 400px; overflow-y: auto; }
+    .episode-item { 
+      background: rgba(0,0,0,0.3); padding: 10px; 
+      margin: 5px 0; border-radius: 6px; cursor: pointer;
+    }
+    .episode-item:hover { background: rgba(251,191,36,0.2); }
+    .badge { 
+      display: inline-block; padding: 4px 8px; 
+      border-radius: 4px; font-size: 12px; margin-left: 8px;
+    }
+    .badge-ai { background: #10b981; color: #000; }
+    .badge-local { background: #6b7280; }
+    @media(max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🪔 GyanDeep Database Software</h1>
+    
+    <div class="grid">
+      <!-- Left: नया उपन्यास बनाओ -->
+      <div class="card">
+        <h2>1. नया उपन्यास जोड़ो</h2>
+        <input type="text" id="upanyasTitle" placeholder="उपन्यास का नाम: जैसे 'श्री दुर्गा सप्तशती'">
+        <textarea id="upanyasDesc" placeholder="विवरण..." rows="3"></textarea>
+        <button onclick="createUpanyas()">+ उपन्यास बनाओ</button>
+      </div>
+
+      <!-- Right: उपन्यास चुनो -->
+      <div class="card">
+        <h2>2. उपन्यास चुनो</h2>
+        <select id="upanyasSelect" onchange="loadEpisodes()">
+          <option value="">-- उपन्यास चुनें --</option>
+        </select>
+        <div id="episodeCount"></div>
+      </div>
+    </div>
+
+    <!-- नया Episode लिखो -->
+    <div class="card">
+      <h2>3. नया Episode लिखो</h2>
+      <div class="grid">
+        <input type="text" id="chapterNo" placeholder="Chapter No: जैसे 'अध्याय 1'">
+        <input type="text" id="episodeTitle" placeholder="Episode Title">
+      </div>
+      <select id="bhasha">
+        <option value="हिंदी">हिंदी</option>
+        <option value="गढ़वाली">गढ़वाली</option>
+        <option value="कुमाऊनी">कुमाऊनी</option>
+        <option value="भोजपुरी">भोजपुरी</option>
+        <option value="संस्कृत">संस्कृत</option>
+      </select>
+      <textarea id="content" placeholder="यहाँ पूरा Episode लिखो..."></textarea>
+      <label>
+        <input type="checkbox" id="uploadAI" checked> AnyThingLLM में भी Upload करो
+      </label>
+      <br><br>
+      <button onclick="saveEpisode()">💾 Save + AI में भेजो</button>
+      <div id="saveStatus"></div>
+    </div>
+
+    <!-- सारे Episodes -->
+    <div class="card">
+      <h2>4. सारे Episodes</h2>
+      <div id="episodeList" class="episode-list"></div>
+    </div>
+  </div>
+
+<script>
+const API = window.location.origin;
+
+async function loadUpanyas() {
+  const res = await fetch(`${API}/api/upanyas`);
+  const data = await res.json();
+  const select = document.getElementById('upanyasSelect');
+  select.innerHTML = '<option value="">-- उपन्यास चुनें --</option>';
+  data.forEach(u => {
+    select.innerHTML += `<option value="${u.id}">${u.title}</option>`;
+  });
+}
+
+async function createUpanyas() {
+  const title = document.getElementById('upanyasTitle').value;
+  const description = document.getElementById('upanyasDesc').value;
+  if(!title) return alert('नाम डालो');
+  
+  await fetch(`${API}/api/upanyas`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ title, description })
+  });
+  
+  document.getElementById('upanyasTitle').value = '';
+  document.getElementById('upanyasDesc').value = '';
+  loadUpanyas();
+  alert('उपन्यास बन गया!');
+}
+
+async function loadEpisodes() {
+  const upanyasId = document.getElementById('upanyasSelect').value;
+  if(!upanyasId) return;
+  
+  const res = await fetch(`${API}/api/episodes/${upanyasId}`);
+  const data = await res.json();
+  
+  document.getElementById('episodeCount').innerHTML = `कुल Episodes: ${data.length}`;
+  
+  const list = document.getElementById('episodeList');
+  list.innerHTML = '';
+  data.forEach(ep => {
+    const badge = ep.ai_uploaded ? '<span class="badge badge-ai">AI में है</span>' : '<span class="badge badge-local">Local</span>';
+    list.innerHTML += `
+      <div class="episode-item">
+        <b>${ep.chapter_no}</b> - ${ep.title} ${badge}<br>
+        <small>${ep.bhasha} | ${new Date(ep.created_at).toLocaleDateString('hi-IN')}</small>
+      </div>`;
+  });
+}
+
+async function saveEpisode() {
+  const upanyas_id = document.getElementById('upanyasSelect').value;
+  if(!upanyas_id) return alert('पहले उपन्यास चुनो');
+  
+  const data = {
+    upanyas_id,
+    chapter_no: document.getElementById('chapterNo').value,
+    title: document.getElementById('episodeTitle').value,
+    content: document.getElementById('content').value,
+    bhasha: document.getElementById('bhasha').value,
+    upload_to_ai: document.getElementById('uploadAI').checked
+  };
+  
+  if(!data.chapter_no || !data.content) return alert('Chapter No और Content जरूरी है');
+  
+  document.getElementById('saveStatus').innerHTML = 'Saving...';
+  const res = await fetch(`${API}/api/episodes`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+  const result = await res.json();
+  
+  document.getElementById('saveStatus').innerHTML = `✅ Save हो गया! ${result.aiStatus}`;
+  document.getElementById('chapterNo').value = '';
+  document.getElementById('episodeTitle').value = '';
+  document.getElementById('content').value = '';
+  loadEpisodes();
+}
+
+// Page Load पर उपन्यास Load करो
+loadUpanyas();
+</script>
+</body>
+  </html>
